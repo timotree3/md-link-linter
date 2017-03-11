@@ -7,6 +7,7 @@ from argparse import ArgumentParser
 parser = ArgumentParser('md-link-linter')
 parser.add_argument('-g', '--git', action='store_true', help="lint a git repository instead of a directory")
 parser.add_argument('-f', '--filter', action='store_true', help="filter only broken links to output")
+parser.add_argument('-r', '--relative', action='store_false', help="show relative (local) links in the output")
 parser.add_argument('location', nargs='+', help="the directories (or repository urls if --git) to lint")
 args = parser.parse_args()
 def read_until(text, stop):
@@ -44,6 +45,8 @@ def find_links(fd):
             pairs.remove(pair)
     for start, end in pairs:
         if text[end+1] != '(':
+            continue
+        if args.relative and text[end+2:end+6] != 'http':
             continue
         for i, line in reversed(tuple(enumerate(lines))):
             if line <= start:
