@@ -64,12 +64,12 @@ if args.git:
             run(['git','clone','-q',repo,'.'],check=True) # clone the repo into the current directory
             rmtree('.git') # remove the .git folder so that we don't have to look for markdown files in it
             for path in find_md_files(clonedir):
-                with open(path, mode='r') as fd: # if it's a markdown file, open it in read mode
+                with open(path) as fd: # if it's a markdown file, open it in read mode
                     links += find_links(fd) # search for links
 else:
     for directory in args.location:
         for path in find_md_files(directory):
-            with open(path, mode='r') as fd: # if it's a markdown file, open it in read mode
+            with open(path) as fd: # if it's a markdown file, open it in read mode
                 links += find_links(fd) # search for links
 for link in links:
     status = check_link(link[1])
