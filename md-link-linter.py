@@ -39,6 +39,9 @@ def find_links(fd):
                 if len(pair) == 1:
                     pairs[i].append(lead[1])
                     break
+    for pair in pairs:
+        if len(pair) == 1:
+            pairs.remove(pair)
     for start, end in pairs:
         if text[end+1] != '(':
             continue
