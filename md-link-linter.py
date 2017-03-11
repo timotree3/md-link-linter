@@ -9,32 +9,43 @@ parser.add_argument('-g', '--git', action='store_true', help="lint a git reposit
 parser.add_argument('location', nargs='+', help="the directories (or repository urls if --git) to lint")
 args = parser.parse_args()
 links = []
-def read_until(fd, start, stop):
-    fd.seek(start)
-    text = ''
-    char = fd.read(1)
-    while char != '':
-        text += char
+def read_until(text, stop):
+    snippet = ''
+    for char in text:
         if char == stop:
-            break
+            return snippet
+        snippet += char
+def scan(fd):
+    fd.seek(0)
+    i = 0
+    char = fd.read(1)
+    while char:
+        if char in ('\n', '[', ']'):
+            yield char, i
         char = fd.read(1)
-    return text
+        i += 1
 def find_links(fd):
-    import re
-    text = ''
-    line_positions = [0]
-    new = read_until(fd, 0, '\n')
-    while new != '':
-        text += new
-        line_positions.append(fd.tell())
-        new = read_until(fd, fd.tell(), '\n')
-    for match in re.finditer(r'!?\[([^\[\]]+)\]\((https?:\/\/[^\)]+)\)', text):
-        for position in reversed(line_positions):
-            if position < match.start():
+    fd.seek(0)
+    text = fd.read()
+    lines = [0]
+    pairs = []
+    for lead in scan(fd):
+        if lead[0] == '\n':
+            lines.append(lead[1])
+        elif lead[0] == '[':
+            pairs.append([lead[1]])
+        elif lead[0] == ']':
+            for i, pair in reversed(tuple(enumerate(pairs))):
+                if len(pair) == 1:
+                    pairs[i].append(lead[1])
+                    break
+    for start, end in pairs:
+        if text[end+1] != '(':
+            continue
+        for i, line in reversed(tuple(enumerate(lines))):
+            if line <= start:
+                yield text[start+1:end], read_until(text[end+2:], ')'), text[line:lines[i+1]]
                 break
-        context = read_until(fd, position, '\n')
-        yield match.group(1), match.group(2), context
-    # returns a list of matches. each match is a tuple of the form: (context, linktext, linkurl)
 def check_link(link):
     return eval(run(['curl', '-s', '-o /dev/null', '-I', '-w "%{http_code}"', link], stdout=PIPE).stdout)
 def find_md_files(directory):
@@ -53,7 +64,6 @@ if args.git:
                     links += find_links(fd) # search for links
 else:
     for directory in args.location:
-        chdir(directory)
         for path in find_md_files(directory):
             with open(path, mode='r') as fd: # if it's a markdown file, open it in read mode
                 links += find_links(fd) # search for links
