@@ -9,7 +9,6 @@ parser.add_argument('-g', '--git', action='store_true', help="lint a git reposit
 parser.add_argument('-f', '--filter', action='store_true', help="filter only broken links to output")
 parser.add_argument('location', nargs='+', help="the directories (or repository urls if --git) to lint")
 args = parser.parse_args()
-links = []
 def read_until(text, stop):
     snippet = ''
     for char in text:
@@ -57,30 +56,31 @@ def find_md_files(directory):
         for entry in files:
             if entry.endswith('.md'):
                 yield dirname+'/'+entry
-if args.git:
-    for repo in args.location:
+for place in args.location:
+    if args.git:
         with TemporaryDirectory() as clonedir: # create a temporary directory to clone the git repo into
             chdir(clonedir)
-            run(['git','clone','-q',repo,'.'],check=True) # clone the repo into the current directory
+            run(['git','clone','-q',place,'.'],check=True) # clone the repo into the current directory
             rmtree('.git') # remove the .git folder so that we don't have to look for markdown files in it
-            for path in find_md_files(clonedir):
-                with open(path) as fd: # if it's a markdown file, open it in read mode
-                    links += find_links(fd) # search for links
-else:
-    for directory in args.location:
-        for path in find_md_files(directory):
-            with open(path) as fd: # if it's a markdown file, open it in read mode
-                links += find_links(fd) # search for links
-for link in links:
-    status = check_link(link[1])
-    if args.filter and status.startswith('2'):
-        continue
-    print("""
-Link found: "{}"
+            files = find_md_files(clonedir)
+    else:
+        files = find_md_files(place)
+    for path in files:
+        links = []
+        with open(path) as fd: # if it's a markdown file, open it in read mode
+            links += find_links(fd) # search for links
+        for link in links:
+            status = check_link(link[1])
+            if args.filter and status.startswith('2'):
+                continue
+            print("""
+Link found in file:
+{}
+Text: "{}"
 URL: "{}"
 Status: {}
 
 in this line:
 {}
-""".format(link[0], link[1], status, link[2]))
-    print('-'*80)
+""".format(path, link[0], link[1], status, link[2]))
+            print('-'*80)
