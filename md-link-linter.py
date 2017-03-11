@@ -6,6 +6,7 @@ from shutil import rmtree
 from argparse import ArgumentParser
 parser = ArgumentParser('md-link-linter')
 parser.add_argument('-g', '--git', action='store_true', help="lint a git repository instead of a directory")
+parser.add_argument('-f', '--filter', action='store_true', help="filter only broken links to output")
 parser.add_argument('location', nargs='+', help="the directories (or repository urls if --git) to lint")
 args = parser.parse_args()
 links = []
@@ -71,6 +72,9 @@ else:
             with open(path, mode='r') as fd: # if it's a markdown file, open it in read mode
                 links += find_links(fd) # search for links
 for link in links:
+    status = check_link(link[1])
+    if args.filter and status.startswith('2'):
+        continue
     print("""
 Link found: "{}"
 URL: "{}"
@@ -78,5 +82,5 @@ Status: {}
 
 in this line:
 {}
-""".format(link[0], link[1], check_link(link[1]), link[2]))
+""".format(link[0], link[1], status, link[2]))
     print('-'*80)
