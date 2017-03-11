@@ -47,7 +47,7 @@ def find_links(fd):
                 yield text[start+1:end], read_until(text[end+2:], ')'), text[line:lines[i+1]]
                 break
 def check_link(link):
-    return eval(run(['curl', '-s', '-o /dev/null', '-I', '-w "%{http_code}"', link], stdout=PIPE).stdout)
+    return eval(run(['curl', '-L', '-s', '-o /dev/null', '-m 5', '-w "%{http_code}"', link], stdout=PIPE).stdout)
 def find_md_files(directory):
     for dirname, dirs, files in walk(directory): # explores the directory tree
         for entry in files:
