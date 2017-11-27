@@ -1,0 +1,6 @@
+[package]
+name = "rlinksdown"
+version = "0.1.0"
+authors = ["timo"]
+
+[dependencies]
