@@ -1,65 +1,55 @@
-#[macro_use]
-extern crate clap;
-#[macro_use]
-extern crate error_chain;
+extern crate failure;
 extern crate pulldown_cmark as pulldown;
 extern crate reqwest;
+extern crate structopt;
+#[macro_use]
+extern crate structopt_derive;
 
-use clap::{App, Arg};
-use std::path::Path;
 use std::fs::File;
 use pulldown::{Event, Parser, Tag};
 use std::io::Read;
+use failure::{Error, ResultExt};
+use structopt::StructOpt;
 
-mod error {
-    error_chain!{}
+#[derive(StructOpt, Debug)]
+struct Args {
+    #[structopt(help = "Markdown file to check.")] file: String,
+}
+type Result<T> = ::std::result::Result<T, Error>;
+
+fn main() {
+    if let Err(e) = run(Args::from_args()) {
+        eprintln!("error: {}", e.backtrace());
+    }
 }
 
-use error::*;
-
-quick_main!(run);
-
-fn run() -> Result<()> {
+fn run(args: Args) -> Result<()> {
     let client = reqwest::Client::new();
-    let matches = App::new(crate_name!())
-        .version(crate_version!())
-        .author(crate_authors!())
-        .about(crate_description!())
-        .arg(
-            Arg::with_name("FILE")
-                .help("Sets the markdown file to check the links in.")
-                .required(true),
-        )
-        .get_matches();
     let contents = {
-        let mut file = File::open(Path::new(matches.value_of_os("FILE").unwrap()))
-            .chain_err(|| "failed to open markdown file")?;
         let mut buf = String::new();
-        file.read_to_string(&mut buf)
-            .chain_err(|| "failed to read file contents")?;
+        { File::open(args.file).context("failed to open markdown file")? }
+            .read_to_string(&mut buf)
+            .context("failed to read file contents")?;
         buf
     };
     let parser = Parser::new(&contents);
     for event in parser {
-        match event {
+        let url = match event {
             Event::Start(tag) => match tag {
-                Tag::Link(href, _title) | Tag::Image(href, _title) => {
-                    match client.get(href.as_ref()).send() {
-                        Ok(response) => {
-                            println!("{}: {}", href, response.status());
-                        }
-                        Err(e) => {
-                            println!("{}: ERROR {:?}", href, e);
-                        }
-                    }
-                }
-                _ => {}
+                Tag::Link(href, _title) | Tag::Image(href, _title) => href,
+                _ => continue,
             },
-            Event::Html(text) | Event::InlineHtml(text) => {
-                let _ = text;
-                // FIXME: extract href from html code
+            // FIXME: extract urls from html code
+            Event::Html(_html) | Event::InlineHtml(_html) => continue,
+            _ => continue,
+        };
+        match client.get(url.as_ref()).send() {
+            Ok(response) => {
+                println!("{}: {}", url, response.status());
             }
-            _ => {}
+            Err(e) => {
+                println!("{}: ERROR {:?}", url, e);
+            }
         }
     }
     Ok(())
